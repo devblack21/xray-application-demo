@@ -211,6 +211,9 @@ Resources:
               Value: "xray-application-demo"
         - Name: "daemon-xray"
           Image: "public.ecr.aws/xray/aws-xray-daemon:latest"
+          Cpu: 192
+          Memory: 512
+          MemoryReservation: 512
           Command: ["-o","-b", "0.0.0.0:2000", "-t", "0.0.0.0:2000"]
           PortMappings:
            - ContainerPort: !Ref DaemonContainerPort
