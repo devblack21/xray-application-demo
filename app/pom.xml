@@ -77,7 +77,7 @@
       <resource>
         <directory>src/main/resources</directory>
         <includes>
-          <include>application.properties</include>
+          <include>application.yml</include>
           <include>sampling-rules.json</include>
         </includes>
       </resource>
