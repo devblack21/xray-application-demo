@@ -1,0 +1,17 @@
+spring:
+  cloud:
+    config:
+      import-check:
+        enabled: false
+
+feign:
+  client:
+    config:
+      feignName:
+        connectTimeout: 5000
+        readTimeout: 5000
+        loggerLevel: basic
+        decode404: false
+        metrics.enabled: false
+    cep:
+      url: "https://ws.apicep.com"
