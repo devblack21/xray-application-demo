@@ -5,6 +5,7 @@ import com.amazonaws.xray.AWSXRayRecorderBuilder;
 import com.amazonaws.xray.javax.servlet.AWSXRayServletFilter;
 import com.amazonaws.xray.plugins.ECSPlugin;
 import com.amazonaws.xray.strategy.sampling.CentralizedSamplingStrategy;
+import com.amazonaws.xray.strategy.sampling.LocalizedSamplingStrategy;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -18,7 +19,7 @@ public class XRayConfig {
 		final AWSXRayRecorderBuilder builder = AWSXRayRecorderBuilder.standard().withPlugin(new ECSPlugin());
 		
 		final URL ruleFile = XRayConfig.class.getResource("/sampling-rules.json");
-		builder.withSamplingStrategy(new CentralizedSamplingStrategy(ruleFile));
+		builder.withSamplingStrategy(new LocalizedSamplingStrategy(ruleFile));
 		
 		AWSXRay.setGlobalRecorder(builder.build());
 	}
