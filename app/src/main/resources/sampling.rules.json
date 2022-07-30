@@ -8,6 +8,22 @@
       "url_path": "/actuator/*",
       "fixed_target": 0,
       "rate": 0.00
+    },
+    {
+      "description": "Actuator2",
+      "host": "*",
+      "http_method": "*",
+      "url_path": "*/actuator/*",
+      "fixed_target": 0,
+      "rate": 0.00
+    },
+    {
+      "description": "Actuator3",
+      "host": "*",
+      "http_method": "*",
+      "url_path": "/actuator/**",
+      "fixed_target": 0,
+      "rate": 0.00
     }
   ],
   "default": {
