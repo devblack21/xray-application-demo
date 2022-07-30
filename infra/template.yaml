@@ -311,7 +311,7 @@ Resources:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: "sg-daemon-xray"
-      VpcId: !Ref VpcValue
+      VpcId: !Ref VpcId
       SecurityGroupIngress:
         - CidrIp: 0.0.0.0/0
           FromPort: 2000
