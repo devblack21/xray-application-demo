@@ -1,5 +1,15 @@
 {
   "version": 2,
+  "rules": [
+    {
+      "description": "Actuator",
+      "host": "*",
+      "http_method": "*",
+      "url_path": "/actuator/*",
+      "fixed_target": 0,
+      "rate": 0.00
+    }
+  ],
   "default": {
     "fixed_target": 1,
     "rate": 0.1

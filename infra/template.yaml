@@ -1,0 +1,329 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Creating ECS service
+
+Parameters:
+
+  ImageValue: 
+    Type: String
+  ImageVersion:
+    Type: String
+    Default: "latest"
+
+  #JVM
+  JvmXms:
+    Type: String
+    Default: "128m"
+  JvmXmx:
+    Type: String
+    Default: "512m"
+  LoggingLevel:
+    Type: String
+    Default: "INFO"
+
+  # App
+  NameService:
+    Type: String
+  DesiredCount:
+    Type: Number
+    Default: 1
+  ClusterArn: 
+    Type: String
+  SecurityGroup: 
+    Type: String
+  DefaultSecurityGroup:
+    Type: String
+  # ExecutionRoleArn: 
+  #   Type: String
+  MemoryValue:
+    Type: Number
+    Default: 512
+  CpuValue:
+    Type: Number
+    Default: 256
+  
+  #Network
+  VpcId: 
+    Type: String
+  Subnet01: 
+    Type: String
+  Subnet02: 
+    Type: String
+  ContainerServicePort: 
+    Type: Number
+  DaemonContainerPort:
+    Type: Number
+
+  #Target Group
+  LoadBalancerAlgorithm: 
+    Type: String
+    AllowedValues:
+      - "round_robin"
+      - "least_outstanding_requests"
+
+  LogGroupName:
+    Type: String
+
+
+Resources:
+
+ ## LOG
+  SeviceLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties: 
+      LogGroupName: !Sub "${NameService}"
+      RetentionInDays: 5
+  
+  DaemonXrayLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties: 
+      LogGroupName: !Ref LogGroupName
+      RetentionInDays: 5
+
+  ### LOAD BALANCER
+  ServiceListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    DependsOn: 
+      - ServiceTargetGroup
+      - ServiceELB
+    Properties: 
+      DefaultActions: 
+        - Type: forward
+          TargetGroupArn: !Ref ServiceTargetGroup
+      LoadBalancerArn: !Ref ServiceELB
+      Port: 80
+      Protocol: HTTP
+
+
+  ServiceTargetGroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties: 
+      HealthCheckEnabled: true
+      HealthCheckIntervalSeconds: 30
+      HealthCheckPath: "/actuator/health"
+      HealthCheckPort: "8081"
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 5
+      IpAddressType: ipv4
+      Matcher: 
+       HttpCode: "200-499"
+      Name: !Sub "${NameService}TG"
+      Port: !Ref ContainerServicePort
+      Protocol: HTTP
+      ProtocolVersion: HTTP1
+      TargetGroupAttributes: 
+        - Key: load_balancing.algorithm.type
+          Value: !Ref LoadBalancerAlgorithm
+      TargetType: ip
+      UnhealthyThresholdCount: 3
+      VpcId: !Ref VpcId
+
+  ServiceELB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties: 
+      IpAddressType: ipv4
+      Name: !Sub "${NameService}ELB"
+      Subnets: 
+        - !Ref Subnet01
+        - !Ref Subnet02
+      SecurityGroups:
+        - !Ref SecurityGroup
+        - !Ref DefaultSecurityGroup
+      Type: application
+
+  ### SERVICE ECS
+  Service:
+    Type: AWS::ECS::Service
+    DependsOn: 
+      - ServiceListener
+    Properties: 
+      Cluster: !Ref ClusterArn
+      DesiredCount: !Ref DesiredCount
+      TaskDefinition: !Ref TaskDefinition
+      DeploymentConfiguration: 
+        DeploymentCircuitBreaker: 
+          Enable: false
+          Rollback: false
+        MaximumPercent: 200
+        MinimumHealthyPercent: 100
+      LoadBalancers:
+        - ContainerName: !Sub "${NameService}Container"
+          ContainerPort: !Ref ContainerServicePort
+          TargetGroupArn: !Ref ServiceTargetGroup
+      EnableECSManagedTags: true
+      EnableExecuteCommand: false
+      LaunchType: FARGATE
+      NetworkConfiguration: 
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          SecurityGroups: 
+            - !Ref SecurityGroup
+            - !Ref SecurityGroupDaemon
+          Subnets: 
+            - !Ref Subnet01
+            - !Ref Subnet02
+      PlatformVersion: "1.4.0"
+      SchedulingStrategy: REPLICA
+      ServiceName: !Ref NameService
+  
+  TaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    DependsOn: 
+      - ServiceLogGroup
+      - DaemonXrayLogGroup
+    Properties: 
+      ContainerDefinitions: 
+        - Name: !Sub "${NameService}Container"
+          DisableNetworking: false
+          Essential: true
+          HealthCheck: 
+            Command: 
+              [
+                  "CMD-SHELL",
+                  !Sub "curl -f http://localhost:${ContainerServicePort}/actuator/health || exit 1",
+              ]
+            Interval: 30
+            Retries: 3
+            StartPeriod: 30
+            Timeout: 10
+          Image: !Sub "${ImageValue}:${ImageVersion}"
+          PortMappings: 
+            - ContainerPort: !Ref ContainerServicePort
+          Privileged: false
+          LogConfiguration: 
+            LogDriver: awslogs
+            Options: 
+              awslogs-group : !Ref NameService
+              awslogs-region: "us-east-1"
+              awslogs-create-group: "true"
+              awslogs-stream-prefix: "awslogs"
+          Environment: 
+            - Name: PORT
+              Value: !Ref ContainerServicePort
+            - Name: SPRING_LOGGING_LEVEL
+              Value: !Ref LoggingLevel
+            - Name: JVM_XMS
+              Value: !Ref JvmXms
+            - Name: JVM_XMX
+              Value: !Ref JvmXmx
+            - Name: AWS_XRAY_CONTEXT_MISSING
+              Value: IGNORE_ERROR
+            - Name: AWS_XRAY_DAEMON_ADDRESS
+              Value: "localhost:2000"
+            - Name: AWS_XRAY_TRACING_NAME
+              Value: "xray-application-demo"
+        - Name: "daemon-xray"
+          Image: "public.ecr.aws/xray/aws-xray-daemon:latest"
+          Command: ["-o","-b", "0.0.0.0:2000", "-t", "0.0.0.0:2000"]
+          PortMappings:
+           - ContainerPort: !Ref DaemonContainerPort
+             Protocol: "udp"
+           - ContainerPort: !Ref DaemonContainerPort
+             Protocol: "tcp"
+          LogConfiguration: 
+            LogDriver: awslogs
+            Options: 
+              awslogs-group : !Ref LogGroupName
+              awslogs-region: "us-east-1"
+              awslogs-create-group: "true"
+              awslogs-stream-prefix: "awslogs" 
+      Cpu: !Ref CpuValue
+      Memory: !Ref MemoryValue
+      ExecutionRoleArn: !GetAtt TaskExecutionRole.Arn
+      Family: !Sub "family-${NameService}"
+      NetworkMode: awsvpc
+      RequiresCompatibilities: 
+        - "FARGATE"
+      RuntimePlatform: 
+          CpuArchitecture: X86_64
+          OperatingSystemFamily: LINUX
+      TaskRoleArn: !Ref TaskExecutionRole
+
+  TaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: "ecs-tasks.amazonaws.com"
+          Action: sts:AssumeRole
+      Path: /
+      Policies:
+        - PolicyName: !Sub "${NameService}-policy-ecr"
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+            - Effect: Allow
+              Action:
+                - ecr:GetAuthorizationToken
+                - ecr:BatchCheckLayerAvailability
+                - ecr:GetDownloadUrlForLayer
+                - ecr:BatchGetImage
+              Resource: '*'
+        - PolicyName: !Sub "${NameService}-policy-logs"
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+            - Effect: Allow
+              Action:
+                - logs:CreateLogGroup
+                - logs:CreateLogStream
+                - logs:PutLogEvents
+                - logs:DescribeLogStreams
+              Resource: '*'
+        - PolicyName: !Sub "${NameService}-policy-xray"
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+            - Effect: Allow
+              Action:
+                - xray:PutTraceSegments
+                - xray:PutTelemetryRecords
+                - xray:GetSamplingRules
+                - xray:GetSamplingTargets
+                - xray:GetSamplingStatisticSummaries
+              Resource: '*'
+        - PolicyName: !Sub "${NameService}-policy-ecs"
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+            - Effect: Allow
+              Action:
+                - ecs:DiscoverPollEndpoint
+                - ecs:RegisterContainerInstance
+                - ecs:SubmitContainerStateChange
+                - ecs:SubmitTaskStateChange
+                - ecs:ListContainerInstances
+                - ecs:Poll
+                - ecs:StartTelemetrySession
+                - ecs:UpdateContainerInstancesState
+                - ecs:ListTasks
+                - ecs:DescribeContainerInstances
+              Resource: '*'
+        - PolicyName: !Sub "${NameService}-policy-passrole"
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+            - Effect: Allow
+              Action:
+                - iam:PassRole
+              Resource: '*'  
+    
+  SecurityGroupDaemon:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "sg-daemon-xray"
+      VpcId: !Ref VpcValue
+      SecurityGroupIngress:
+        - CidrIp: 0.0.0.0/0
+          FromPort: 2000
+          ToPort: 2000
+          IpProtocol: tcp
+        - CidrIp: 0.0.0.0/0
+          FromPort: 2000
+          ToPort: 2000
+          IpProtocol: udp
+      SecurityGroupEgress:
+        - CidrIp: 0.0.0.0/0
+          IpProtocol: -1

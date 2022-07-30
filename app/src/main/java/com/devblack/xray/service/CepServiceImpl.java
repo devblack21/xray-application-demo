@@ -22,9 +22,7 @@ public class CepServiceImpl implements CepService {
 	@Override
 	public Address returnInfoCep(final String cep) {
 		final AtomicReference<CepResponse> cepResponse = new AtomicReference<>();
-		XRayTrace.trace("api-cep", () -> {
-			 cepResponse.set(cepClient.describeCep(Integer.parseInt(cep.replace("-", ""))).getBody());
-		});
+		XRayTrace.trace("api-cep", () -> cepResponse.set(this.cepClient.describeCep(Integer.parseInt(cep)).getBody()));
 		return EnderecoMapper.mapFrom(cepResponse.get());
 	}
 	
