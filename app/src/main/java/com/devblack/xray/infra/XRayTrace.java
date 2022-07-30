@@ -9,9 +9,9 @@ public class XRayTrace {
 	
 	public static void trace(final String traceId, final Runnable runnable) {
 		
-		final Segment segment = AWSXRay.beginSegment(traceId);
 		final Subsegment subsegment = AWSXRay.beginSubsegment(traceId);
-
+		final Segment segment = AWSXRay.beginSegment(traceId);
+		
 		try {
 			runnable.run();
 		} catch (final Exception e) {

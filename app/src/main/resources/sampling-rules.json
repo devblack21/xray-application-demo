@@ -2,6 +2,7 @@
   "version": 2,
   "rules": [
     {
+      "service_name": "*",
       "description": "Actuator",
       "host": "*",
       "http_method": "*",
