@@ -13,7 +13,6 @@ import java.util.Objects;
 import java.util.concurrent.atomic.AtomicReference;
 
 @Service
-@XRayEnabled
 public class CepServiceImpl implements CepService {
 	
 	@Autowired
