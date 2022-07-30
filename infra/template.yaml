@@ -168,9 +168,6 @@ Resources:
   
   TaskDefinition:
     Type: AWS::ECS::TaskDefinition
-    DependsOn: 
-      - ServiceLogGroup
-      - DaemonXrayLogGroup
     Properties: 
       ContainerDefinitions: 
         - Name: !Sub "${NameService}Container"
