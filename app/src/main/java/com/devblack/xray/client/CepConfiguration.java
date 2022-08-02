@@ -32,13 +32,4 @@ public class CepConfiguration extends FeignClientsConfiguration {
 				.setDefaultRequestConfig(defaultRequestConfig).build());
 	}
 	
-	@Bean
-	public FeignFormatterRegistrar localDateFeignFormatterRegister() {
-		return registry -> {
-			DateTimeFormatterRegistrar registrar = new DateTimeFormatterRegistrar();
-			registrar.setUseIsoFormat(true);
-			registrar.registerFormatters(registry);
-		};
-	}
-	
 }
