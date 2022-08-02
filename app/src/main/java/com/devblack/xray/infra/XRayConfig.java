@@ -29,9 +29,9 @@ public class XRayConfig {
 		return new AWSXRayServletFilter("xray-application-demo");
 	}
 
-	@Bean
-	public HttpClientBuilder xrayHttpClientBuilder() {
-		return HttpClientBuilder.create();
-	}
+//	@Bean
+//	public HttpClientBuilder xrayHttpClientBuilder() {
+//		return HttpClientBuilder.create();
+//	}
 	
 }
